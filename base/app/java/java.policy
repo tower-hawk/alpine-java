@@ -1,0 +1,3 @@
+grant codeBase "file:/app/java/jolokia-jvm-agent.jar" {
+        permission java.security.AllPermission;
+};
