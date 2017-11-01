@@ -1,7 +1,5 @@
 #!/bin/bash
 
-#usage ./build.sh
-
 cd $(dirname $(realpath ${BASH_SOURCE[0]}))
 
 set -e

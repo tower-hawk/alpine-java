@@ -1,5 +1,5 @@
 #!/bin/bash
 
-. /app/*-functions.sh
+source /app/*-functions.sh
 
 run $@

@@ -10,6 +10,5 @@ ENV PATH /app:/app/health:$PATH
 
 ENTRYPOINT ["/bin/bash", "entrypoint.sh"]
 
-HEALTHCHECK --interval=3m --timeout=10s --retries=1 \
-  CMD ["/app/health/check.sh"]
+HEALTHCHECK --interval=3m --timeout=10s --retries=1 CMD ["/app/health/check.sh"]
 

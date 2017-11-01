@@ -1,7 +1,7 @@
 #!/bin/bash
 # This script is meant to be sourced by entrypoint.sh scripts or be referenced directly
 
-thisDir=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
+thisDir=$(cd $(dirname $(realpath ${BASH_SOURCE[0]})) && pwd)
 appDir=${thisDir}
 
 if [ ${#BASH_SOURCE[@]} -ge 1 ]; then

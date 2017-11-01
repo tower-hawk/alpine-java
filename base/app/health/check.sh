@@ -1,3 +1,3 @@
 #!/bin/bash
 
-eval ${HEALTH_CHECK_CMD}
+eval "${HEALTH_CHECK_CMD}"

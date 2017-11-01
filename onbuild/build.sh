@@ -8,4 +8,4 @@ base="towerhawk/alpine-java-onbuild"
 version="$1"
 build_tag="$base:$version"
 
-docker build $2 -t "$build_tag" .
+docker build -t "$build_tag" .
