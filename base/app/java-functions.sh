@@ -119,6 +119,20 @@ function add_user_libs() {
 debug CLASSPATH="${CLASSPATH}"
 }
 
+function set_classpath() {
+if [ "x${CLASSPATH_DIRS}" != "x" ]; then
+  for path in ${CLASSPATH_DIRS}
+  do
+    if [ -d ${path} ]; then
+      for file in ${path}/*
+      do
+        export CLASSPATH="${CLASSPATH}:$(realpath ${file})"
+      done
+    fi
+  done
+fi
+}
+
 function run_settings() {
   app_settings
   jmx_settings
@@ -126,6 +140,7 @@ function run_settings() {
   gc_log_settings
   gc_settings
   jvm_settings
+  set_classpath
   add_user_libs
   export JAVA_PARAMS="${JAVA_PARAMS} ${JMX_OPTS} ${HEAP_OPTS} ${GC_LOG_OPTS} ${GC_OPTS} ${JVM_OPTS} ${APP_OPTS}"
   debug JAVA_PARAMS=${JAVA_PARAMS}
