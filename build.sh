@@ -1,6 +1,6 @@
 #!/bin/bash
 
-version="8-1.0.1"
+version="8-1.1.0"
 
 base/build.sh "${version}"
 onbuild/build.sh "${version}"

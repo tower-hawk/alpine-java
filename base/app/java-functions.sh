@@ -22,6 +22,13 @@ export APP_NAME="${APP_NAME:-app}"
 export APP_HOME="${APP_HOME:-${appDir}}"
 [ "x${LOG_DIR}" = "x" ] && export LOG_DIR=${APP_HOME}/logs
 
+function file_settings() {
+  [ -f "${SETTINGS_FILE}" ] && export FILE_SETTINGS="$(cat ${SETTINGS_FILE} | xargs)"
+  debug FILE_SETTINGS=${FILE_SETTINGS}
+  [ -f "${ARGUMENTS_FILE}" ] && export FILE_ARGUMENTS="$(cat ${ARGUMENTS_FILE} | xargs)"
+  debug FILE_ARGUMENTS=${FILE_ARGUMENTS}
+}
+
 function app_settings() {
 export APP_OPTS="-Dlog.dir=${LOG_DIR} \
 ${APP_OPTS}"
@@ -97,14 +104,19 @@ ${HEAP_DUMP_ON_OOME} \
 function jvm_settings() {
 DEFAULT_JOLOKIA_PORT=${DEFAULT_JOLOKIA_PORT:-$(($JMX_PORT + 10000))}
 [ "x$DISABLE_LARGE_PAGES" != "x" ] && LARGE_PAGES="${LARGE_PAGES:- -XX:+UseLargePages}"
+[ "x$DISABLE_AGGRESSIVE_OPTS" != "x" ] && AGGRESSIVE_OPTS="${AGGRESSIVE_OPTS:- -XX:+AggressiveOpts}"
 if [ "x${JVM_OVERRIDES}" == "x" ] ; then
+  JAVA_IO_TMPDIR="${JAVA_IO_TMPDIR:-/tmp/$APP}"
+  mkdir -p ${JAVA_IO_TMPDIR}
   export JVM_OPTS="-server \
--XX:+AggressiveOpts \
--XX:MaxMetaspaceSize=256m \
+-XX:MaxMetaspaceSize=${MAX_METASPACE_SIZE:-256m} \
 -Djava.awt.headless=true \
 -Duser.timezone=${USER_TIMEZONE:-UTC} \
 -Dnetworkaddress.cache.ttl=${DNS_TTL:-300} \
+-Dfile.encoding=${FILE_ENCODING:-UTF-8} \
+-Djava.io.tmpdir=${JAVA_IO_TMPDIR} \
 ${LARGE_PAGES} \
+${AGGRESSIVE_OPTS} \
 -javaagent:${thisDir}/java/jolokia-jvm-agent.jar=${JOLOKIA_CONFIG:-port=${JOLOKIA_PORT:-$DEFAULT_JOLOKIA_PORT},host=0.0.0.0,discoveryEnabled=false,agentContext=/jmx} \
 ${JVM_OPTS}"
 else
@@ -134,6 +146,7 @@ fi
 }
 
 function run_settings() {
+  file_settings
   app_settings
   jmx_settings
   heap_settings
@@ -142,7 +155,7 @@ function run_settings() {
   jvm_settings
   set_classpath
   add_user_libs
-  export JAVA_PARAMS="${JAVA_PARAMS} ${JMX_OPTS} ${HEAP_OPTS} ${GC_LOG_OPTS} ${GC_OPTS} ${JVM_OPTS} ${APP_OPTS}"
+  export JAVA_PARAMS="${JAVA_PARAMS} ${JMX_OPTS} ${HEAP_OPTS} ${GC_LOG_OPTS} ${GC_OPTS} ${JVM_OPTS} ${FILE_SETTINGS} ${APP_OPTS}"
   debug JAVA_PARAMS=${JAVA_PARAMS}
 }
 
@@ -151,15 +164,20 @@ function run() {
   app="${1:-$APP_NAME}"
   if [ "x$app" == "x$APP_NAME" ]; then
     shift
-    SERVICE_NAME=${SERVICE_NAME:-$app}
-    MAIN_CLASS=${MAIN_CLASS:-"-jar *.jar"}
+    export APP="$app"
+    export SERVICE_NAME=${SERVICE_NAME:-$app}
+    MAIN_CLASS=${MAIN_CLASS:-" -jar *.jar"}
     cd ${APP_WORKDIR:-$APP_HOME}
+
+    [ -x "${ENV_FILE}" ] && source "${ENV_FILE}"
+
+    [ "x${DEBUG}" == "xtrue" ] && echo "Environment variables: " && env
 
     run_settings
 
     #Echo the classpath because it can't be found by using ps
     echo CLASSPATH="${CLASSPATH}"
-    CMD="java -Dapp.${app} ${JAVA_PARAMS} ${MAIN_CLASS} ${ARGS} $@ ${OVERRIDES}"
+    CMD="java -Dapp.${app} ${JAVA_PARAMS} ${MAIN_CLASS} ${ARGS} $@ ${OVERRIDES} ${FILE_ARGUMENTS}"
     debug CMD="${CMD}"
     exec ${CMD}
   else
