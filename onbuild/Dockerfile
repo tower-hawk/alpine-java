@@ -1,4 +1,4 @@
-FROM towerhawk/alpine-java-base:base-latest
+FROM towerhawk/alpine-java-base:latest
 
 ONBUILD ARG UID=1000
 ONBUILD ARG GID=$UID
@@ -6,7 +6,7 @@ ONBUILD ARG APP_NAME
 ONBUILD ARG USER=$APP_NAME
 ONBUILD ARG GROUP=$USER
 ONBUILD ARG ADDITIONAL_COMMANDS="echo finishing onbuild"
-ONBUILD ARG DEFAULT_JMX_PORT=14295
+ONBUILD ARG DEFAULT_JMX_PORT=18080
 
 ONBUILD ENV PATH=/app/$APP_NAME/bin:/app/$APP_NAME:$PATH \
   APP_NAME=$APP_NAME \
@@ -19,12 +19,9 @@ ONBUILD ENV PATH=/app/$APP_NAME/bin:/app/$APP_NAME:$PATH \
 
 ONBUILD RUN mkdir -p $APP_HOME \
        $APP_HOME/logs \
-       $APP_HOME/etc \
-       $APP_HOME/config \
        $APP_HOME/bin \
-       $APP_HOME/health \
-  && addgroup -g $GID $GROUP \
-  && adduser -u $UID -h $APP_HOME -s /bin/sh -D -H -G $GROUP $USER \
+  && (addgroup -g $GID $GROUP || echo groupid $GID or group $GROUP already exists ... skipping) \
+  && (adduser -u $UID -h $APP_HOME -s /bin/sh -D -H -G $GROUP $USER || echo userid $UID or user $USER already exists ... skipping) \
   && chown -R $USER:$GROUP /app/*.sh /app/health $APP_HOME $APP_HOME/* \
   && eval $ADDITIONAL_COMMANDS
 
