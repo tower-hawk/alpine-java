@@ -20,6 +20,14 @@ function debug () {
 
 export LOG_DIR="${LOG_DIR:-${APP_HOME}/logs}"
 
+function run_commands() {
+  for command in $(compgen -A variable | grep -e "^${1}_" | sort)
+  do
+    debug "${command}=${!command}"
+    eval "${!command}"
+  done
+}
+
 function file_settings() {
   [ -f "${ENV_FILE}" ] && . ${ENV_FILE}
   for file in $(compgen -A variable | grep -e "^ENV_FILE_" | sort)
@@ -32,7 +40,8 @@ function file_settings() {
   for file in $(compgen -A variable | grep -e "^SETTINGS_FILE_" | sort)
   do
     debug "${file}=${!file}"
-    export FILE_SETTINGS="${FILE_SETTINGS} ${!file}"
+    # grep -v ignores any lines that start with # or spaces then #. xargs takes care of empty lines
+    export FILE_SETTINGS="${FILE_SETTINGS} $(cat "${!file}" | grep -v "^[[:space:]]*#" | xargs)"
   done
   debug FILE_SETTINGS="${FILE_SETTINGS}"
 
@@ -40,21 +49,12 @@ function file_settings() {
   for file in $(compgen -A variable | grep -e "^ARGUMENTS_FILE_" | sort)
   do
     debug "${file}=${!file}"
-    export FILE_ARGUMENTS="${FILE_ARGUMENTS} ${!file}"
+    export FILE_ARGUMENTS="${FILE_ARGUMENTS} $(cat "${!file}" | grep -v "^[[:space:]]*#" | xargs)"
   done
   debug FILE_ARGUMENTS="${FILE_ARGUMENTS}"
 }
 
-function run_commands_pre() {
-  for command in $(compgen -A variable | grep -e "^RUN_PRE_" | sort)
-  do
-    debug "${command}=${!command}"
-    ${!command}
-  done
-}
-
 function app_settings() {
-  export APP_OPTS
   for opt in $(compgen -A variable | grep -e "^APP_OPT_" | sort)
   do
     debug "${opt}=${!opt}"
@@ -64,7 +64,6 @@ function app_settings() {
 }
 
 function log_settings() {
-  export LOG_OPTS
   : ${LOG_OPT_LOG_DIR="-Dlog.dir=${LOG_DIR}"}
   for opt in $(compgen -A variable | grep -e "^LOG_OPT_" | sort)
   do
@@ -115,7 +114,7 @@ function jmx_settings() {
       : ${JMX_OPT_AUTHENTICATE="-Dcom.sun.management.jmxremote.authenticate=false"}
     fi
   fi
-  export JMX_OPTS
+
   for opt in $(compgen -A variable | grep -e "^JMX_OPT_" | sort)
   do
     debug "${opt}=${!opt}"
@@ -127,8 +126,7 @@ function jmx_settings() {
 function heap_settings() {
   MIN_HEAP=-Xms${MIN_HEAP_SIZE:-64m}
   MAX_HEAP=-Xmx${MAX_HEAP_SIZE:-256m}
-  JAVA_HEAP_OPTS="${MIN_HEAP} ${MAX_HEAP}"
-  : ${HEAP_OPTS="${JAVA_HEAP_OPTS}"}
+  : ${HEAP_OPTS="${MIN_HEAP} ${MAX_HEAP}"}
 
   export HEAP_OPTS
   for opt in $(compgen -A variable | grep -e "^HEAP_OPT_" | sort)
@@ -221,7 +219,7 @@ function jvm_agents() {
     debug "${agent}=${!agent}"
     export JVM_AGENTS="${JVM_AGENTS} ${!agent}"
   done
-  debug "JAVA_AGENT=${JVM_AGENTS}"
+  debug "JVM_AGENTS=${JVM_AGENTS}"
 }
 
 function add_user_libs() {
@@ -241,7 +239,7 @@ function add_user_libs() {
   for path in $(compgen -A variable | grep -e "^USER_LIB_" | sort)
   do
     debug "${path}=${!path}"
-    export CLASSPATH="${CLASSPATH}:${!path}"
+    [[ "x${!path}" != "x" ]] && export CLASSPATH="${!path}:${CLASSPATH}"
   done
 
   [ "x${USER_LIBS}" != "x" ] && export CLASSPATH="${USER_LIBS}:${CLASSPATH}"
@@ -258,13 +256,24 @@ function set_classpath() {
         done
       fi
     done
+    unset CLASSPATH_DIRS
   fi
 
-  unset CLASSPATH_DIRS
+  for path in $(compgen -A variable | grep -e "^CLASSPATH_DIR_" | sort)
+  do
+    debug "${path}=${!path}"
+    if [ -d ${!path} ]; then
+      for file in ${!path}/*
+      do
+        export CLASSPATH="${CLASSPATH}:$(realpath ${file})"
+      done
+    fi
+  done
+
   for path in $(compgen -A variable | grep -e "^CLASSPATH_" | sort)
   do
     debug "${path}=${!path}"
-    export CLASSPATH="${CLASSPATH}:${!path}"
+    [[ "x${!path}" != "x" ]] && export CLASSPATH="${CLASSPATH}:${!path}"
   done
 
   add_user_libs
@@ -273,17 +282,22 @@ function set_classpath() {
   echo "CLASSPATH=${CLASSPATH}"
 }
 
-function run_commands_post() {
-  for command in $(compgen -A variable | grep -e "^RUN_POST_")
+function resolve_args_overrides() {
+  for arg in $(compgen -A variable | grep -e "^ARG_")
   do
-    debug "${command}=${!command}"
-    ${!command}
+    export ARGS="${ARGS} ${!arg}"
+  done
+
+  for override in $(compgen -A variable | grep -e "^OVERRIDE_")
+  do
+    export OVERRIDES="${OVERRIDES} ${!override}"
   done
 }
 
 function run_settings() {
+  run_commands RUN_PRE
   file_settings
-  run_commands_pre
+  run_commands RUN_MID
   app_settings
   log_settings
   jmx_settings
@@ -293,30 +307,43 @@ function run_settings() {
   jvm_settings
   jvm_agents
   set_classpath
-  run_commands_post
+  resolve_args_overrides
+  run_commands RUN_POST
   export JAVA_PARAMS="${JAVA_PARAMS} ${JVM_AGENTS} ${JMX_OPTS} ${HEAP_OPTS} ${GC_LOG_OPTS} ${GC_OPTS} ${JVM_OPTS} ${FILE_SETTINGS} ${LOG_OPTS} ${APP_OPTS}"
   debug JAVA_PARAMS=${JAVA_PARAMS}
 }
 
+function trapExec() {
+  echo "Trapped signal"
+  if [[ "x${PREKILL_CMD}" != "x" ]]; then
+    echo "Evaluating '${PREKILL_CMD}'"
+    eval "${PREKILL_CMD}"
+  fi
+  echo "Sending TERM to ${PID}"
+  kill -TERM ${PID}
+  echo "Sent TERM to ${PID}"
+}
+
 function run() {
-  USE_EXEC="${USE_EXEC:-true}"
+  : ${USE_EXEC=true}
   if [ "x${1:-$APP_NAME}" == "x$APP_NAME" ]; then
     shift
     #Used for images that can run multiple services with a single build
     export SERVICE_NAME=${SERVICE_NAME:-${APP_NAME}}
-    MAIN_CLASS=${MAIN_CLASS:-" -jar *.jar"}
-    cd ${APP_WORKDIR:-$APP_HOME}
+    : ${MAIN_CLASS="-jar *.jar"}
+    : ${APP_WORKDIR=${APP_HOME}}
+    cd ${APP_WORKDIR}
 
     run_settings
-    [ "x${DEBUG}" == "xtrue" ] && echo "Environment variables: " && env
+    [ "x${DEBUG}" == "xtrue" ] && echo "Environment variables: " && echo && env | sort && echo
 
-    CMD="java -Dapp.${SERVICE_NAME} ${JAVA_PARAMS} ${FILE_SETTINGS} ${MAIN_CLASS} ${ARGS} $@ ${OVERRIDES} ${FILE_ARGUMENTS}"
-    debug CMD="${CMD}"
+    CMD="java -Dapp.${SERVICE_NAME} ${JAVA_PARAMS} ${MAIN_CLASS} ${ARGS} $@ ${OVERRIDES} ${FILE_ARGUMENTS}"
+    debug "CMD=${CMD}"
     if [[ "x${USE_EXEC}" == "xfalse" ]]; then
-      trap 'kill -TERM ${PID}' TERM INT
+      trap trapExec TERM INT
       ${CMD} &
-      PID=$!
-      debug "Waiting on ${PID}"
+      export PID=$!
+      echo -e "##################################\nWaiting on pid ${PID}\n##################################"
       wait ${PID}
       trap - TERM INT
       wait ${PID}
