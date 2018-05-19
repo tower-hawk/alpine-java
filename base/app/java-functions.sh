@@ -268,6 +268,7 @@ function set_classpath() {
         export CLASSPATH="${CLASSPATH}:$(realpath ${file})"
       done
     fi
+    unset ${path}
   done
 
   for path in $(compgen -A variable | grep -e "^CLASSPATH_" | sort)
@@ -285,13 +286,16 @@ function set_classpath() {
 function resolve_args_overrides() {
   for arg in $(compgen -A variable | grep -e "^ARG_")
   do
+    debug "${arg}=${!arg}"
     export ARGS="${ARGS} ${!arg}"
   done
-
+  debug "ARGS=${ARGS}"
   for override in $(compgen -A variable | grep -e "^OVERRIDE_")
   do
+    debug "${override}=${!override}"
     export OVERRIDES="${OVERRIDES} ${!override}"
   done
+  debug "OVERRIDES=${OVERRIDES}"
 }
 
 function run_settings() {
