@@ -320,12 +320,13 @@ function run_settings() {
 function trapExec() {
   echo "Trapped signal"
   if [[ "x${PREKILL_CMD}" != "x" ]]; then
+    [[ "x${DEBUG}" == "xtrue" ]] && eval "${PREKILL_DEBUG}"
     echo "Evaluating '${PREKILL_CMD}'"
     eval "${PREKILL_CMD}"
   fi
-  echo "Sending TERM to ${PID}"
-  kill -TERM ${PID}
-  echo "Sent TERM to ${PID}"
+  : ${KILL_SIGNAL="TERM"}
+  echo "Sending ${KILL_SIGNAL} to ${PID}"
+  kill -${KILL_SIGNAL} ${PID}
 }
 
 function run() {
@@ -344,15 +345,19 @@ function run() {
     CMD="java -Dapp.${SERVICE_NAME} ${JAVA_PARAMS} ${MAIN_CLASS} ${ARGS} $@ ${OVERRIDES} ${FILE_ARGUMENTS}"
     debug "CMD=${CMD}"
     if [[ "x${USE_EXEC}" == "xfalse" ]]; then
-      trap trapExec TERM INT
+      : ${TRAP_SIGNALS="TERM INT"}
+      trap trapExec ${TRAP_SIGNALS}
       ${CMD} &
       export PID=$!
       echo -e "##################################\nWaiting on pid ${PID}\n##################################"
       wait ${PID}
-      trap - TERM INT
+      trap - ${TRAP_SIGNALS}
+      echo "waiting for pid ${PID}"
       wait ${PID}
-      EXIT_STATUS=$?
-      exit ${EXIT_STATUS}
+      echo "pid ${PID} stopped"
+      # RUN_AFTER only available for processes that run in the background since exec always terminates pid 1
+      run_commands RUN_AFTER
+      echo "exiting"
     else
       exec ${CMD}
     fi

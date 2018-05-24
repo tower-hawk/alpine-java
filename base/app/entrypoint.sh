@@ -2,4 +2,4 @@
 
 source /app/*-functions.sh
 
-run $@
+run "$@"
