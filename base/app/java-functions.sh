@@ -9,6 +9,7 @@ if [ ${#BASH_SOURCE[@]} -ge 1 ]; then
 fi
 
 export APP_NAME="${APP_NAME:-app}"
+export SERVICE_NAME="${SERVICE_NAME:-${APP_NAME}}"
 if [ "x${appDir}" == "x/app" ] && [ -d "/app/${APP_NAME}" ]; then
   appDir="/app/${APP_NAME}"
 fi
@@ -212,7 +213,9 @@ function jvm_settings() {
 }
 
 function jvm_agents() {
-  JOLOKIA_CONFIG="${JOLOKIA_CONFIG:-port=${JOLOKIA_PORT:-$DEFAULT_JOLOKIA_PORT},host=${JOLOKIA_HOST:-0.0.0.0},user=${JOLOKIA_USER},password=${JOLOKIA_PASSWORD},discoveryEnabled=${JOLOKIA_DISCOVERY_ENABLED:-false},agentContext=${JOLOKIA_AGENT_CONTEXT:-/jmx} }"
+  [[ "x${JOLOKIA_USER}" != "x" ]] && JOLOKIA_USER_OPT=",user=${JOLOKIA_USER}"
+  [[ "x${JOLOKIA_PASSWORD}" != "x" ]] && JOLOKIA_PASSWORD_OPT=",password=${JOLOKIA_PASSWORD}"
+  JOLOKIA_CONFIG="${JOLOKIA_CONFIG:-${JOLOKIA_USER_OPT}${JOLOKIA_PASSWORD_OPT}port=${JOLOKIA_PORT:-$DEFAULT_JOLOKIA_PORT},host=${JOLOKIA_HOST:-0.0.0.0},discoveryEnabled=${JOLOKIA_DISCOVERY_ENABLED:-false},agentContext=${JOLOKIA_AGENT_CONTEXT:-/jmx} }"
   : ${JVM_AGENT_OPT_JOLOKIA="${JOLOKIA_AGENT:- -javaagent:${thisDir}/java/jolokia-jvm-agent.jar=${JOLOKIA_CONFIG}}"}
   for agent in $(compgen -A variable | grep -e "^JVM_AGENT_OPT_")
   do
@@ -334,7 +337,6 @@ function run() {
   if [ "x${1:-$APP_NAME}" == "x$APP_NAME" ]; then
     shift
     #Used for images that can run multiple services with a single build
-    export SERVICE_NAME=${SERVICE_NAME:-${APP_NAME}}
     : ${MAIN_CLASS="-jar *.jar"}
     : ${APP_WORKDIR=${APP_HOME}}
     cd ${APP_WORKDIR}
