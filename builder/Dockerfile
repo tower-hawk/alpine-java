@@ -1,4 +1,4 @@
-FROM anapsix/alpine-java:8_jdk_unlimited
+FROM openjdk:14-alpine
 
 RUN  mkdir -p /build \
   && apk add --update --no-cache \

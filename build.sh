@@ -1,7 +1,11 @@
 #!/bin/bash
 
-version="8-1.2.4"
+set -e
 
-base/build.sh "${version}"
-onbuild/build.sh "${version}"
-builder/build.sh "${version}"
+version="14-1.0.0"
+
+thisDir=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
+
+${thisDir}/base/build.sh "${version}"
+${thisDir}/onbuild/build.sh "${version}"
+${thisDir}/builder/build.sh "${version}"

@@ -141,14 +141,14 @@ function heap_settings() {
 
 function gc_log_settings() {
   if [ "x${LOGGC}" != "xfalse" ]; then
-    : ${GC_LOG_OPT_LOG="-Xloggc:${LOG_DIR}/${SERVICE_NAME}-gc.log"}
-    : ${GC_LOG_OPT_VERBOSE="-verbose:gc"}
-    : ${GC_LOG_OPT_PRINT_DETAILS="-XX:+PrintGCDetails"}
-    : ${GC_LOG_OPT_PRINT_DATESTAMPS="-XX:+PrintGCDateStamps"}
-    : ${GC_LOG_OPT_PRINT_TIMESTAMPS="-XX:+PrintGCTimeStamps"}
-    : ${GC_LOG_OPT_USE_FILE_ROTATION="-XX:+UseGCLogFileRotation"}
-    : ${GC_LOG_OPT_NUMBER_LOG_FILES="-XX:NumberOfGCLogFiles=${NUMBEROFGCLOGFILES:-5}"}
-    : ${GC_LOG_OPT_LOG_FILE_SIZE="-XX:GCLogFileSize=${GCLOGFILESIZE:-5M}"}
+    : ${GC_LOG_FILE="${LOG_DIR}/${SERVICE_NAME}-gc.log"}
+    : ${GC_NUMBER_LOG_FILES="5"}
+    : ${GC_LOG_FILE_SIZE="5M"}
+    : ${GC_REF_LEVEL="debug"}
+    : ${GC_HEAP_LEVEL="debug"}
+    : ${GC_AGE_LEVEL="trace"}
+    : ${GC_DECORATORS="tags,uptime,time,level"}
+    : ${GC_LOG_OPT_OPTIONS="-Xlog:gc*,gc+ref=${GC_REF_LEVEL},gc+heap=${GC_HEAP_LEVEL},gc+age=${GC_AGE_LEVEL}:file=${GC_LOG_FILE}:${GC_DECORATORS}:filecount=${GC_NUMBER_LOG_FILES},filesize=${GC_LOG_FILE_SIZE}"}
   fi
 
   for opt in $(compgen -A variable | grep -e "^GC_LOG_OPT_" | sort)
