@@ -2,7 +2,7 @@
 
 set -e
 
-version="14-1.0.0"
+version="14-1.0.1"
 
 thisDir=$(cd $(dirname ${BASH_SOURCE[0]}) && pwd)
 
